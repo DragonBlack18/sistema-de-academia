@@ -1,0 +1,35 @@
+name: Prepare PostgreSQL test runtime
+on:
+  push:
+    branches: [implementation/secure-web-consolidation]
+    paths: [.github/workflows/postgres-test-runtime.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Extract official PostgreSQL 18 binaries (no database or application data)
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull postgres:18-trixie
+          docker image inspect postgres:18-trixie --format '{{index .RepoDigests 0}}' > image-digest.txt
+          mkdir -p pg-runtime/usr/lib/postgresql pg-runtime/usr/share/postgresql
+          id=$(docker create postgres:18-trixie)
+          trap 'docker rm -v "$id" >/dev/null' EXIT
+          docker cp "$id:/usr/lib/postgresql/18" pg-runtime/usr/lib/postgresql/18
+          docker cp "$id:/usr/share/postgresql/18" pg-runtime/usr/share/postgresql/18
+          docker run --rm --entrypoint bash postgres:18-trixie -c 'postgres --version; ldd /usr/lib/postgresql/18/bin/postgres' > runtime-versions.txt
+          tar -czf pg-runtime.tar.gz pg-runtime image-digest.txt runtime-versions.txt
+          sha256sum pg-runtime.tar.gz > pg-runtime.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vitality-postgres18-runtime
+          path: |
+            pg-runtime.tar.gz
+            pg-runtime.sha256
+          retention-days: 2
+          if-no-files-found: error
