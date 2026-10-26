@@ -1,0 +1,41 @@
+name: Verify pinned build dependencies
+on:
+  push:
+    branches: [implementation/secure-web-consolidation]
+    paths: [.github/workflows/dependency-verification.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  dependencies:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Resolve exact application dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build-dependencies
+          cd build-dependencies
+          printf '%s\n' '{"private":true,"name":"vitality-build-dependencies","version":"0.0.0"}' > package.json
+          npm install --save-exact next@16.4.3 react@19.3.1 react-dom@19.3.1 typescript@5.9.3 @types/node@22 @types/react@19 @types/react-dom@19
+          npm ls --depth=0 > dependency-versions.txt
+          npm audit --json > npm-audit.json || test "$?" = 1
+          python -m pip download --only-binary=:all: --dest wheels 'psycopg[binary]>=3.2,<4'
+          tar -czf ../build-dependencies.tar.gz package.json package-lock.json dependency-versions.txt npm-audit.json node_modules wheels
+          cd ..
+          sha256sum build-dependencies.tar.gz > build-dependencies.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vitality-build-dependencies
+          path: |
+            build-dependencies.tar.gz
+            build-dependencies.sha256
+          retention-days: 2
+          if-no-files-found: error
