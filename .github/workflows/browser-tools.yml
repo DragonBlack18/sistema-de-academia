@@ -1,0 +1,47 @@
+name: Browser verification tools
+on:
+  push:
+    branches: [implementation/consolidacao-web]
+    paths: [.github/workflows/browser-tools.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  tools:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Download matching test browser
+        run: |
+          mkdir -p tooling
+          cd tooling
+          npm init -y
+          npm install --no-audit --no-fund playwright@1.55.0 prettier@3.6.2
+          npx playwright install --only-shell chromium
+          tar -czf ../browser-toolchain.tar.gz -C "$HOME/.cache" ms-playwright
+          tar -czf ../format-toolchain.tar.gz node_modules
+      - name: Prepare PowerShell parser
+        run: |
+          location="$(dirname "$(readlink -f "$(command -v pwsh)")")"
+          tar -czf powershell-toolchain.tar.gz -C "$location" .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: browser-toolchain
+          path: browser-toolchain.tar.gz
+          retention-days: 3
+          compression-level: 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: format-toolchain
+          path: format-toolchain.tar.gz
+          retention-days: 3
+          compression-level: 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: powershell-toolchain
+          path: powershell-toolchain.tar.gz
+          retention-days: 3
+          compression-level: 0
