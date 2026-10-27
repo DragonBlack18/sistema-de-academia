@@ -1,0 +1,7 @@
+APP_ENV="development"
+ADMIN_LOGIN="davibrandzoletti11@gmail"
+# O setup gera uma senha aleatoria neste campo local. Nunca publique .dev.vars.
+ADMIN_PASSWORD=""
+ENABLE_DEMO_DATA="false"
+# Gerado automaticamente por npm run setup:local; preserve apos configurar MFA.
+TOTP_ENCRYPTION_KEY=""

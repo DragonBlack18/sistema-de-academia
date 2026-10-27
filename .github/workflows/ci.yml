@@ -1,0 +1,56 @@
+name: Vitality Gym — qualidade e integração
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vitality-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  full-stack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Preparar Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Instalar dependências travadas
+        run: npm ci
+      - name: Auditar dependências de produção
+        run: |
+          mkdir -p outputs
+          npm audit --omit=dev --audit-level=moderate --json > outputs/dependency-audit.json
+      - name: Tipos, build, SQL, integração e reinicialização
+        run: node scripts/test-ci.mjs
+      - name: Guardar evidências
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: vitality-gym-validation
+          path: |
+            outputs/ci-report.json
+            outputs/integration-report.json
+            outputs/restart-report.json
+            outputs/finance-report.json
+            outputs/backend-flows-report.json
+            outputs/backend-restart-report.json
+            outputs/security-hardening-report.json
+            outputs/domain-hardening-report.json
+            outputs/operations-hardening-report.json
+            outputs/dependency-audit.json
+            outputs/worker-test.log
+          if-no-files-found: warn
+          retention-days: 14

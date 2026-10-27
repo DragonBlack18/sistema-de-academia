@@ -1,0 +1,50 @@
+import {metadata,insert,statement,now,today,dayOffset,addMonths,first,uid} from './domain/common';
+/** Optional sample records, only called by bootstrap when ENABLE_DEMO_DATA=true. No real member information. */
+export async function seedDemo(db:D1Database,adminId:string){
+ if(await first(db,"SELECT id FROM seed_runs WHERE id='demo-v1'"))return;
+ const date=today(),created=dayOffset(date,-70)+'T15:00:00.000Z';
+ const meta=(id:string,at=created)=>({...metadata(id),created_at:at,updated_at:at});
+ const q:D1PreparedStatement[]=[insert(db,'seed_runs',{id:'demo-v1',created_at:now()})];
+ const plans=[['essencial','Essencial',9900,1,'Musculação'],['performance','Performance',14900,1,'Musculação, funcional'],['total','Total',19900,1,'Todas as modalidades'],['trimestral','Trimestral',39900,3,'Musculação, funcional'],['semestral','Semestral',74900,6,'Todas as modalidades'],['anual','Anual',129900,12,'Todas as modalidades']] as const;
+ for(const[p,name,price,duration,modalities]of plans)q.push(insert(db,'plans',{...meta('demo-plan-'+p),name,description:'Plano ilustrativo para explorar o sistema. Valores e condições podem ser editados.',price_cents:price,duration_months:duration,modalities,status:'active'}));
+ const names=['Ana Martins','Bruno Costa','Camila Ribeiro','Diego Almeida','Elisa Ferreira','Felipe Santos','Gabriela Lima','Henrique Souza','Isabela Rocha','João Pereira','Larissa Oliveira','Marcos Silva','Natália Gomes','Otávio Nunes','Paula Barros','Rafael Duarte','Sofia Mendes','Tiago Freitas'];
+ for(let i=0;i<names.length;i++){
+  const id='demo-student-'+(i+1),at=dayOffset(date,-(60-i*3))+'T14:00:00.000Z';const plan=plans[i%plans.length];
+  q.push(insert(db,'students',{...meta(id,at),name:names[i],email:`aluno${i+1}@example.invalid`,phone:null,notes:'[Demonstração] Cadastro fictício. Substitua pelos dados autorizados da sua academia.',trainer_id:adminId,status:i===17?'inactive':'active'}));
+  if(i===17)continue;
+  const start=dayOffset(date,-15),end=dayOffset(addMonths(start,plan[3]),-1),mid='demo-membership-'+(i+1),iid='demo-invoice-'+(i+1);const due=i<3?dayOffset(date,-5-i):i<6?dayOffset(date,2+i):start;
+  q.push(insert(db,'memberships',{...meta(mid,at),student_id:id,plan_id:'demo-plan-'+plan[0],contracted_price_cents:plan[2],discount_cents:0,duration_months:plan[3],start_date:start,end_date:end,due_date:due,status:i===16?'suspended':'active',notes:'[Demonstração] Matrícula fictícia.'}));
+  q.push(insert(db,'invoices',{...meta(iid,dayOffset(date,-20+i)+'T15:00:00.000Z'),student_id:id,membership_id:mid,description:`Mensalidade · ${plan[1]}`,amount_cents:plan[2],due_date:due,status:'open'}));
+  if(i>=6){const paid=dayOffset(date,-20+i)+'T16:00:00.000Z';q.push(insert(db,'payments',{id:'demo-payment-'+(i+1),invoice_id:iid,amount_cents:plan[2],method:i%2?'pix':'card',status:'completed',idempotency_key:'seed-payment-'+i,created_by:adminId,created_at:paid}),statement(db,"UPDATE invoices SET status='paid',paid_at=?,payment_method=? WHERE id=?",[paid,i%2?'pix':'card',iid]));}
+ }
+ for(let day=1;day<=29;day++){
+  const num=day%5+2;
+  for(let n=0;n<num;n++){const at=dayOffset(date,-day);const student='demo-student-'+(7+(day+n)%9);q.push(insert(db,'attendance',{id:`demo-attendance-${day}-${n}`,student_id:student,check_in:at+`T${String(10+n*2).padStart(2,'0')}:15:00.000Z`,check_out:at+`T${String(11+n*2).padStart(2,'0')}:25:00.000Z`,created_by:adminId,override_reason:null}));}
+ }
+ for(let i=0;i<4;i++){const input=new Date(Date.now()-(i+1)*50*60*1000).toISOString();q.push(insert(db,'attendance',{id:'demo-attendance-today-'+i,student_id:'demo-student-'+(7+i),check_in:input,check_out:i>1?new Date(Date.now()-i*12*60*1000).toISOString():null,created_by:adminId,override_reason:null}));}
+ const staff=[['Marina Castro','Professora','Musculação e condicionamento'],['Lucas Andrade','Personal trainer','Treinamento funcional'],['Beatriz Melo','Recepção','Atendimento e matrículas'],['Pedro Ferreira','Professor','Mobilidade e fortalecimento'],['Renata Souza','Financeiro','Contas e recebimentos']];
+ for(let i=0;i<staff.length;i++)q.push(insert(db,'staff',{...meta('demo-staff-'+i),name:staff[i][0],position:staff[i][1],specialty:staff[i][2],email:`equipe${i+1}@example.invalid`,status:'active'}));
+ const exercises=[['Agachamento livre','Pernas','Barra'],['Supino reto','Peitoral','Barra e banco'],['Remada baixa','Costas','Polia'],['Desenvolvimento','Ombros','Halteres'],['Leg press','Pernas','Máquina'],['Puxada alta','Costas','Polia'],['Rosca alternada','Bíceps','Halteres'],['Tríceps corda','Tríceps','Polia'],['Prancha abdominal','Core','Colchonete'],['Elevação lateral','Ombros','Halteres'],['Cadeira extensora','Pernas','Máquina'],['Caminhada na esteira','Cardio','Esteira']];
+ for(let i=0;i<exercises.length;i++)q.push(insert(db,'exercises',{...meta('demo-exercise-'+i),name:exercises[i][0],muscle_group:exercises[i][1],equipment:exercises[i][2],instructions:'Exercício de demonstração. A prescrição e orientação devem ser realizadas pelo profissional responsável.',status:'active'}));
+ for(let i=0;i<6;i++){
+  const id='demo-workout-'+i;q.push(insert(db,'workouts',{...meta(id,dayOffset(date,-10+i)+'T16:00:00.000Z'),student_id:'demo-student-'+(7+i),trainer_id:adminId,name:i%2?'Condicionamento · AB':'Adaptação · ABC',objective:'Ficha fictícia para demonstrar a organização de treinos.',notes:'[Demonstração] Revisar com profissional antes de utilizar.',valid_until:dayOffset(date,30),status:i<4?'active':'draft'}));
+  for(let j=0;j<4;j++)q.push(insert(db,'workout_items',{id:`demo-workout-item-${i}-${j}`,workout_id:id,exercise_id:'demo-exercise-'+((i+j)%exercises.length),day:j<2?'A':'B',sets:3,reps:'10–12',load:'Conforme orientação',rest_seconds:60,notes:null,position:j}));
+  q.push(insert(db,'assessments',{...meta('demo-assessment-'+i),student_id:'demo-student-'+(7+i),assessed_at:dayOffset(date,-14+i),weight_kg:65+i*3,height_cm:165+i*2,body_fat_pct:20+i,waist_cm:75+i,chest_cm:90+i,hip_cm:95+i,notes:'[Demonstração] Medidas fictícias.',created_by:adminId}));
+ }
+ const classNames=[['Funcional','Funcional','Studio 01',16],['Mobilidade','Mobilidade','Studio 02',12],['Circuito de força','Musculação','Sala principal',10],['Bike indoor','Cardio','Studio 01',14],['Alongamento','Mobilidade','Studio 02',18],['Treino em grupo','Funcional','Área externa',20]] as const;
+ for(let i=0;i<classNames.length;i++){
+  const day=dayOffset(date,1+Math.floor(i/3)),time=String(10+(i%3)*4).padStart(2,'0');const id='demo-class-'+i;
+  q.push(insert(db,'classes',{...meta(id),name:classNames[i][0],modality:classNames[i][1],instructor_id:adminId,starts_at:`${day}T${time}:00:00.000Z`,duration_minutes:50,capacity:classNames[i][3],location:classNames[i][2],status:'scheduled'}));
+  for(let j=0;j<Math.min(3+i,6);j++)q.push(insert(db,'bookings',{id:`demo-booking-${i}-${j}`,class_id:id,student_id:'demo-student-'+(7+j),created_by:adminId,created_at:now()}));
+ }
+ const products=[['Whey protein 900 g','Suplementos',14990,10990,8,3],['Garrafa esportiva','Acessórios',3990,1800,15,5],['Barra de proteína','Alimentos',1290,700,2,10],['Camiseta Vitality','Vestuário',7990,4000,12,4],['Toalha de treino','Acessórios',2990,1200,5,3]] as const;
+ for(let i=0;i<products.length;i++){const p=products[i];q.push(insert(db,'products',{...meta('demo-product-'+i),name:p[0],sku:'DEMO-'+(i+1),category:p[1],price_cents:p[2],cost_cents:p[3],stock:p[4],min_stock:p[5],status:'active'}),insert(db,'stock_movements',{id:'demo-stock-'+i,product_id:'demo-product-'+i,quantity:p[4],kind:'adjustment',reason:'[Demonstração] Estoque inicial fictício',created_by:adminId,created_at:created}));}
+ q.push(insert(db,'suppliers',{...meta('demo-supplier-1'),name:'Distribuidora Exemplo',contact_name:'Contato de demonstração',email:'fornecedor@example.invalid',notes:'[Demonstração] Fornecedor fictício.',status:'active'}));
+ q.push(insert(db,'purchases',{...meta('demo-purchase-1',dayOffset(date,-2)+'T15:00:00.000Z'),supplier_id:'demo-supplier-1',total_cents:14000,notes:'[Demonstração] Compra aguardando recebimento.',status:'draft',created_by:adminId}),insert(db,'purchase_items',{id:'demo-purchase-item-1',purchase_id:'demo-purchase-1',product_id:'demo-product-2',quantity:20,unit_cost_cents:700}));
+ for(let i=0;i<4;i++)q.push(insert(db,'expenses',{...meta('demo-expense-'+i,dayOffset(date,-20+i*5)+'T15:00:00.000Z'),description:['Aluguel da unidade','Manutenção de equipamentos','Materiais de limpeza','Internet e sistemas'][i],category:['Infraestrutura','Manutenção','Insumos','Serviços'][i],amount_cents:[180000,35000,18900,19900][i],due_date:dayOffset(date,-20+i*5),status:i===2?'open':'paid',paid_at:i===2?null:dayOffset(date,-20+i*5)}));
+ const leads=[['Clara Dias','Instagram','Funcional','new'],['André Luz','Indicação','Musculação','contacted'],['Luiza Campos','Visita à unidade','Plano Total','trial'],['Gustavo Neves','Site','Aula experimental','new']];
+ for(let i=0;i<leads.length;i++)q.push(insert(db,'leads',{...meta('demo-lead-'+i,dayOffset(date,-4+i)+'T14:00:00.000Z'),name:leads[i][0],email:`contato${i}@example.invalid`,source:leads[i][1],interest:leads[i][2],status:leads[i][3],notes:'[Demonstração] Contato fictício.'}));
+ q.push(insert(db,'notifications',{...meta('demo-notification-1',now()),title:'Seu Vitality Gym está pronto para explorar',message:'Os cadastros identificados como demonstração são fictícios. Você pode criar seus próprios planos, alunos, fichas e configurações.',severity:'info',recipient_id:null,created_by:adminId}),insert(db,'notifications',{...meta('demo-notification-2',now()),title:'Acompanhe os vencimentos',message:'O painel financeiro reúne cobranças, pagamentos e estornos. Cada confirmação atualiza os indicadores.',severity:'info',recipient_id:null,created_by:adminId}));
+ q.push(insert(db,'audit_logs',{id:uid(),user_id:adminId,action:'demo.seed',entity:'system',entity_id:'demo-v1',summary:'Dados fictícios de demonstração carregados uma única vez.',created_at:now()}));
+ try{await db.batch(q);}catch(error){if(await first(db,"SELECT id FROM seed_runs WHERE id='demo-v1'"))return;throw error;}
+}
