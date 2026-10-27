@@ -1,0 +1,11 @@
+{
+  "profile": "product-admin",
+  "sourceRoots": ["components", "app"],
+  "locale": "pt-BR",
+  "canonicalMap": "UX-CONTRACT.md",
+  "requiredCapabilities": ["Select/Listbox", "Date", "Form", "Scrollbar", "Toast", "CRUD"],
+  "ownership": {"Select/Listbox": "native", "Date": "native"},
+  "requiredCommands": ["typecheck", "integration"],
+  "commands": {"typecheck": "npm run typecheck", "integration": "npm run test:integration"},
+  "evidence": {"crudFullFlow": "tests/integration.mjs", "failurePaths": "tests/integration.mjs"}
+}
