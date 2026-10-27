@@ -6,7 +6,7 @@ O frontend permaneceu congelado nesta rodada. O trabalho se concentrou em persis
 
 ## Escopo do ambiente
 
-As suítes HTTP desta evidência foram executadas contra a prévia oficial local `http://terminal.local:4173/`, usando Worker, D1 e R2 locais. Foram criadas contas e informações sintéticas, sem importar o banco anterior, acionar gateways de pagamento, enviar mensagens ou operar equipamentos físicos. O código da aplicação recebeu as mesmas requisições de API que são usadas pelo frontend; não houve substituição de respostas do servidor por mocks.
+As suítes HTTP foram executadas contra a prévia oficial local `http://terminal.local:4173/`, usando Worker, D1 e R2 locais, e repetidas no GitHub Actions em uma base isolada. No CI, o build real é servido por Miniflare/workerd com HTTP, assets e bindings preservados. Foram criadas contas e informações sintéticas, sem importar o banco anterior, acionar gateways de pagamento, enviar mensagens ou operar equipamentos físicos. O código da aplicação recebeu as mesmas requisições de API que são usadas pelo frontend; não houve substituição de respostas do servidor por mocks.
 
 O banco publicado não foi usado como base de testes. O fato de o processo local estar acessível não foi tratado como prova de prontidão operacional: o endpoint restrito de prontidão retornou **503** e identificou os requisitos pendentes do ambiente de teste, como se espera.
 
@@ -27,11 +27,21 @@ O banco publicado não foi usado como base de testes. O fato de o processo local
 | ESLint da fonte completa | **PASS — 0 erros/avisos** | Execução geral, sem reduzir regras do projeto. |
 | Build oficial de publicação | **PASS** | Worker, cliente e SSR compilados; aviso de chunk acima de 500 kB permanece sem alteração do frontend. |
 | Auditoria de dependências de produção | **PASS — 0 vulnerabilidades conhecidas** | `npm audit --omit=dev --json`, relatório `outputs/npm-audit-production.json`. |
-| Pipeline remoto no GitHub Actions | **Ainda não confirmado nesta evidência** | O workflow foi preparado com versões fixadas por SHA, conta efêmera, testes e artefatos; o run remoto será verificado após o envio ao repositório. |
+| Pipeline remoto no GitHub Actions | **PASS — job completo e artefatos confirmados** | [Execução 40546837491](https://github.com/DragonBlack18/sistema-de-academia/actions/runs/40546837491), commit da PR `52409b01f058c5141d19d17bfe8c53ad6ad20c7f`; conclusão da suíte às 14:04:14 em 27/10/2026. |
 
 Os relatórios JSON são gerados localmente e como artefatos no CI; não são incluídos na árvore pública do código. O nome e a quantidade de gates descrevem verificações agrupadas, não porcentagem de cobertura de linhas ou comprovação formal de ausência de defeitos.
 
 As suítes HTTP e de persistência somam **68 gates aprovados**: 21 de integração, 1 de conferência financeira, 24 de fluxos complementares e 22 após reinício. As 584 verificações contabilizadas da suíte complementar estão dentro de seus 24 gates; elas não são somadas novamente ao total.
+
+Somados aos **57 gates determinísticos** — 21 de segurança, 28 de domínio e 8 de operação — são **125 gates aprovados, sem falhas**, além de tipos, lint, build, migrações e auditoria de dependências. A execução remota acima repetiu essas suítes completas em Ubuntu com Node 24, incluindo a parada e a partida de dois processos distintos sobre os mesmos dados isolados.
+
+## Execução remota e correção do harness
+
+A primeira execução remota interrompeu o teste de origem após o proxy de `wrangler dev` devolver 503 imediatamente depois da rejeição 413 de um corpo excessivo. A inspeção da versão instalada e os relatos upstream indicaram uma falha na camada de proxy; a mensagem não comprovava um reinício real do Worker. O harness passou a executar o build diretamente em Miniflare/workerd, usando o adaptador e o runtime da mesma dependência fixada pelo lockfile.
+
+A execução aprovada manteve os testes e os códigos esperados, inclusive a sequência imediata 413 → 403. Não foram acrescentadas pausas artificiais, repetição de requisições ou exceções para aceitar falhas. Os logs passaram a ser drenados durante a execução, e falha no encerramento do runtime também reprova o CI. O resultado foi confirmado pelo job completo `full-stack` e pelo artefato `vitality-gym-validation`, ID `12753715633`.
+
+Os relatórios de CI têm retenção de 14 dias nos artefatos. Esta evidência registra a execução identificada acima; para alterações posteriores, consulte o resultado do commit correspondente na [aba Actions](https://github.com/DragonBlack18/sistema-de-academia/actions).
 
 ## O que foi exercitado
 
