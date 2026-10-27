@@ -6,7 +6,7 @@ New, self-contained app. TypeScript + React/Vinext; Cloudflare D1 SQL; R2 files.
 Root agent: server/auth.ts, server/security.ts, API route wrapper, client API utilities, app/page.tsx, app/layout.tsx, components/App.tsx, components/Shell.tsx, components/Dashboard.tsx, components/Settings.tsx, global CSS, package and deploy. Backend agent: db/schema.ts, server/domain.ts and server/domain/*, migrations, server/seed.ts. Frontend agent: components/Modules.tsx and components/modules/*, components/ui.tsx, lib/modules.ts. QA/docs agent: tests/*.mjs, docs except this contract/DESIGN/UX, README.md, .github/workflows, scripts/setup-local.mjs and scripts/test-ci.mjs if needed. Ask root before modifying package.
 
 ## HTTP conventions
-GET /api/health public; GET /api/branding public only safe visual keys; GET /api/me -> {user, csrfToken, settings}; POST /api/login {login,password,otp?} -> {user, csrfToken, settings}; POST /api/logout; POST /api/password {currentPassword,newPassword}; cookie HttpOnly SameSite Strict, Secure when HTTPS. Mutations require X-CSRF-Token plus Origin validation (login checks Origin only). JSON errors {error:string, code?:string, fields?:Record<string,string>}, actual HTTP status. JSON writes size capped. No tokens in localStorage. User = {id,name,login,role,active,permissions:string[],mustChangePassword?:boolean}. Role enum super_admin, admin, manager, reception, finance, trainer, personal. Server authorizes every route; trainer/personal scoped to assigned students.
+GET /api/health public; GET /api/branding public only safe visual keys; GET /api/me -> {user, csrfToken, settings, settingsVersion, preferences, preferencesVersion}; POST /api/login {login,password,otp?} -> {user, csrfToken, settings}; POST /api/logout; POST /api/password {currentPassword,newPassword}; cookie HttpOnly SameSite Strict, Secure when HTTPS. Mutations require X-CSRF-Token plus Origin validation (login checks Origin only). JSON errors {error:string, code?:string, fields?:Record<string,string>}, actual HTTP status. JSON writes size capped. No tokens in localStorage. User = {id,name,login,role,active,permissions:string[],mustChangePassword?:boolean}. Role enum super_admin, admin, manager, reception, finance, trainer, personal. Server authorizes every route; trainer/personal scoped to assigned students.
 
 ## Domain handler
 Backend exports async handleDomain(request: Request, url: URL, db: D1Database, actor: Actor): Promise<Response | null>. Actor defined/imported from server/auth.ts = {id,name,login,role,active,permissions:string[]}. Use JSON responses. No auth/CSRF in domain; API wrapper handles that. Backend exports `seedDemo(db, adminId)` from server/seed.ts, idempotent, optional env flag ENABLE_DEMO_DATA true; bootstrap root seeds admin + settings singleton. Demo records explicitly synthetic.
@@ -42,3 +42,43 @@ Schema with foreign keys, indexes, status enums checked in Zod, nonnegative cent
 ## Backend hardening 1.1.0
 
 `GET /api/health` and `HEAD /api/health` check required database schema; unsupported methods return 405. `GET /api/system/readiness` requires super_admin and reports configuration checks (200 ready, 503 incomplete), without credentials. Every API response includes `X-Request-ID`; JSON errors include the same identifier; 429 includes Retry-After. Session idle timeout is 30 minutes, absolute timeout remains 12 hours. TOTP counters are consumed transactionally once. Existing UI payload shapes remain compatible.
+
+## Personalização persistente
+
+O contrato compartilhado, sem dependências de framework, está em `lib/personalization.ts`. O servidor valida o formato com schemas estritos em `server/settings.ts`; não aceita CSS, HTML, JavaScript, URLs de imagens externas ou chaves de configuração desconhecidas. Identidade visual, preferências pessoais e regras operacionais têm escopos distintos.
+
+| Recurso | Leitura | Escrita e efeito |
+| --- | --- | --- |
+| `/api/settings` | `settings.read`: `{settings,version}` | `PATCH {version,settings:<partial GymSettings>}` exige `settings.write`, publica apenas após commit; o objeto deve conter ao menos um campo. |
+| `/api/preferences` | Qualquer conta ativa: `{preferences,version}` da própria sessão | `PATCH {version,preferences:<UserPreferences>}` **substitui** o conjunto de sobreposições pessoais. `{}` volta à herança. Versão inicial sem registro: `0`; primeira gravação: `1`. Não aceita `user_id`. |
+| `/api/settings/history` | `settings.read`: lista paginada de snapshots e diferenças | Histórico não possui edição ou exclusão. Cada alteração de configurações gera um snapshot na mesma transação que a alteração e a auditoria. |
+| `/api/settings/history/:snapshotVersion/restore` | — | `POST {version:<versão atual>}` com `settings.write`: cria uma **nova** versão aplicando somente a aparência do snapshot; preserva `accessGraceDays` e `roleDefaults` atuais. |
+| `/api/settings/themes` | `settings.read`: lista paginada, `kind=theme\|draft` opcional | `POST {name,kind,settings:<AppearanceSettings>}` com `settings.write`: salva tema/rascunho completo sem publicar. |
+| `/api/settings/themes/:id` | `settings.read`: registro completo | `PATCH {version,name?,kind?,settings?}` com `settings.write`; `settings`, quando enviado, substitui a aparência inteira do tema. Não altera a aparência publicada. |
+| `/api/assets` | `settings.read`: biblioteca paginada, `kind=logo\|wallpaper` opcional | `POST multipart` com `settings.write`: mantém validação PNG/JPEG/WebP, dimensão, estrutura e limite de 5 MB. Enviar não publica. |
+
+Listas novas usam `page` (inicial `1`) e `pageSize` (inicial `12`, máximo `50`) e retornam `{data,total,page,pageSize}`. Histórico é ordenado por versão decrescente; temas por atualização/ID decrescentes; imagens por criação/ID decrescentes. O histórico contém `{version,settings,created_by,created_at,user_name,source,restored_from,changed_keys}`. `changed_keys` compara o snapshot com seu predecessor disponível. Não há reconstrução de versões anteriores à migração; a configuração existente é o primeiro snapshot preservado.
+
+Temas e rascunhos contêm `{id,name,kind,settings,version,created_by,created_at,updated_at}`; nome tem 2–70 caracteres. `AppearanceSettings` exclui `accessGraceDays` e `roleDefaults`. Para publicar um tema, o editor carrega sua aparência na prévia e usa o `PATCH /settings` explícito com a versão atual. Não há aplicação automática ao criar ou abrir um tema.
+
+### Herança e autorização
+
+Preferências ausentes herdam os padrões do perfil (`roleDefaults`), depois os padrões da academia. As preferências incluem tema, fonte, lado e modo da navegação, densidade de tabelas, escala de texto, redução de movimento/transparência, página inicial e até oito favoritos únicos. Páginas e ícones vêm de catálogos finitos. Página inicial e favoritos precisam estar disponíveis nas permissões do titular; padrões por perfil são validados contra o perfil escolhido. Preferências não concedem permissões. Após uma mudança de perfil, o cliente filtra destinos que deixaram de estar disponíveis.
+
+Todas as gravações revalidam conta ativa, papel, versão da conta, sessão vinculada e versão do registro no momento do commit. Duas primeiras gravações simultâneas de preferências não podem sobrescrever uma à outra. Conflitos retornam `409` sem alteração parcial de preferências, snapshots, temas ou auditoria. Dados armazenados inválidos falham com `503`, em vez de serem silenciosamente substituídos por padrões.
+
+### Marca, imagens e exposição pública
+
+`GET /branding` projeta somente `AppearanceSettings`; não entrega regras de carência nem padrões por perfil. As seis referências de arquivo são `logoAssetId`, `logoDarkAssetId`, `logoLightAssetId`, `faviconAssetId` (tipo `logo`), `wallpaperAssetId` e `loginImageAssetId` (tipo `wallpaper`). O tipo é conferido também na transação de publicação ou gravação do tema.
+
+`GET /assets/:id` é público somente para arquivos referenciados pela **configuração publicada atual**. Arquivos presentes apenas em rascunhos, temas ou histórico exigem sessão com `settings.read`. A biblioteca retorna `{id,name,kind,mime,size,url,created_at,inUse}`, sem chave de armazenamento, dados de conta ou credenciais. `inUse` significa referência na aparência publicada atual. Não há exclusão de imagens nesta versão, preservando as referências dos snapshots e temas.
+
+A migração `0003_personalization.sql` acrescenta somente o schema de `user_preferences`, `settings_history` e `appearance_presets`; mantém intactos contas, credenciais, configurações, registros operacionais e arquivos existentes. Na inicialização idempotente do aplicativo, a configuração atual é preservada como snapshot inicial. Cada gravação também garante seu predecessor dentro da transação antes de criar a nova versão.
+
+### Compatibilidade de publicação e recuperação
+
+As migrações devem estar aplicadas antes de iniciar o Worker atualizado. O healthcheck verifica as três tabelas novas sem criar registros. Se a inicialização for interrompida depois de criar a configuração e antes de registrar seu snapshot, a próxima tentativa idempotente completa o snapshot; a gravação protegida também captura o predecessor ausente.
+
+Depois que esta versão gravar os campos novos de personalização, um Worker antigo da versão 1.1.0 rejeita o JSON estendido por usar um schema estrito anterior. Portanto, apenas voltar ao bundle antigo não constitui recuperação compatível. Para desfazer uma aparência, restaure um snapshot no aplicativo atualizado. Para corrigir uma falha de código, publique uma versão que continue entendendo este contrato. Uma recuperação completa de banco exige procedimento separado e verificado; não se deve apagar tabelas novas nem substituir a base operacional automaticamente.
+
+Referências de implementação: [transações via D1 `batch`](https://developers.cloudflare.com/d1/worker-api/d1-database/#batch) e [autorização em cada solicitação — OWASP](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html).

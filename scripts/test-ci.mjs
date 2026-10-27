@@ -27,7 +27,7 @@ let logStream;
 let stage = 'preparation';
 let failure = null;
 const startedAt = new Date().toISOString();
-for (const name of ['integration-report.json', 'restart-report.json', 'finance-report.json', 'backend-flows-report.json', 'backend-restart-report.json', 'security-hardening-report.json', 'domain-hardening-report.json', 'operations-hardening-report.json']) writeFileSync(path.join(projectRoot, 'outputs', name), JSON.stringify({ status: 'NOT_RUN', startedAt }) + '\n');
+for (const name of ['integration-report.json', 'restart-report.json', 'finance-report.json', 'backend-flows-report.json', 'backend-restart-report.json', 'security-hardening-report.json', 'domain-hardening-report.json', 'operations-hardening-report.json', 'personalization-hardening-report.json', 'personalization-flows-report.json', 'personalization-restart-report.json']) writeFileSync(path.join(projectRoot, 'outputs', name), JSON.stringify({ status: 'NOT_RUN', startedAt }) + '\n');
 writeFileSync(path.join(projectRoot, 'outputs/worker-test.log'), '');
 
 function run(args, env = testEnv) {
@@ -106,6 +106,7 @@ try {
   await run(['tests/security-hardening.mjs']);
   await run(['tests/domain-hardening.mjs']);
   await run(['tests/operations-hardening.mjs']);
+  await run(['tests/personalization-hardening.mjs']);
   if (!process.argv.includes('--skip-build')) { stage = 'build'; console.log('[ci] Compilando Worker e frontend.'); await run(['scripts/run-framework.mjs', 'build']); }
   stage = 'migrations';
   console.log('[ci] Preparando banco isolado.');
@@ -117,12 +118,15 @@ try {
   await run(['tests/finance-reports.mjs']);
   stage = 'backend-flows';
   await run(['tests/backend-flows.mjs']);
+  stage = 'personalization-flows';
+  await run(['tests/personalization-flows.mjs']);
   await stop();
   stage = 'restart';
   console.log('[ci] Reiniciando o mesmo ambiente para verificar persistência.');
   await start();
   await run(['tests/integration.mjs', '--persistence'], { ...testEnv, VG_TEST_REPORT: 'outputs/restart-report.json' });
   await run(['tests/backend-flows.mjs', '--persistence']);
+  await run(['tests/personalization-flows.mjs', '--persistence']);
 } catch (error) {
   failure = error instanceof Error ? error.message : String(error);
   console.error(`[ci] FAIL: ${error instanceof Error ? error.message : String(error)}`);

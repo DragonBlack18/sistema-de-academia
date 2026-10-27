@@ -1,10 +1,14 @@
 # Validação da versão web
 
+Esta matriz acompanha a **versão 1.2.0**. O comportamento de personalização está em [PERSONALIZACAO.md](PERSONALIZACAO.md), e os resultados efetivamente executados nesta rodada estão em [VALIDACAO-PERSONALIZACAO.md](VALIDACAO-PERSONALIZACAO.md). A evidência histórica da revisão de backend 1.1.0 permanece em [VALIDACAO-EXECUTADA.md](VALIDACAO-EXECUTADA.md).
+
 ## Evidência e limites
 
 `tests/integration.mjs` testa o servidor HTTP real, seus cookies, regras de negócio e gravações no banco. `scripts/test-ci.mjs` compila a aplicação e usa uma base D1/R2 local separada, com um reinício entre a suíte principal e a conferência de persistência.
 
 `tests/backend-flows.mjs` complementa essa execução com a matriz de sete perfis, todos os módulos de listagem e os fluxos que precisam de várias alterações para terminar. As expectativas de permissões ficam declaradas no teste de forma independente do catálogo do servidor: mudar acidentalmente um papel no backend não atualiza o teste junto.
+
+`tests/personalization-hardening.mjs` verifica a migração aditiva, os commits atômicos, o isolamento de contas, os conflitos e os tokens de tema em cenários determinísticos. `tests/personalization-flows.mjs` percorre as novas APIs no Worker real e verifica os mesmos dados após reinício. O harness completo inclui ambas as suítes; não basta executar somente a comparação numérica de cores para aprovar a interface.
 
 A existência dos testes não significa que eles passaram. Os resultados executados ficam em:
 
@@ -17,6 +21,9 @@ A existência dos testes não significa que eles passaram. Os resultados executa
 - `outputs/security-hardening-report.json`: testes determinísticos dos controles de autenticação e concorrência.
 - `outputs/domain-hardening-report.json`: testes determinísticos de regras e transações de domínio.
 - `outputs/operations-hardening-report.json`: configuração, bootstrap, prontidão e backup/restauração sintéticos.
+- `outputs/personalization-hardening-report.json`: migração, permissões, concorrência, histórico, temas, cálculo de contraste e proteção contra respostas antigas do cliente HTTP.
+- `outputs/personalization-flows-report.json`: integração HTTP de preferências, identidade, biblioteca, temas/rascunhos e restauração.
+- `outputs/personalization-restart-report.json`: releitura das configurações, versões históricas, temas, imagens e preferências dos sete perfis após reinício.
 - `outputs/dependency-audit.json`: resultado da consulta de vulnerabilidades nas dependências de produção no CI.
 - `outputs/worker-test.log`: saída do Worker no ambiente isolado de testes.
 
@@ -33,6 +40,14 @@ npm run test:ci
 
 O harness cria uma pasta temporária ignorada em `.sites-runtime`, uma conta `qa.owner@example.invalid`, uma senha aleatória e uma chave de MFA próprias. Aplica todas as migrações em um D1 novo, inicia o Worker compilado, executa as suítes e reinicia o processo usando o mesmo diretório de persistência. Ele não reutiliza o banco normal em `.wrangler/state`, não usa o ambiente publicado e não imprime a senha. Os relatórios publicados pelo CI não incluem o arquivo de ambiente, o banco ou os snapshots completos das fixtures.
 
+Para executar somente os testes determinísticos de personalização, sem servidor HTTP:
+
+```sh
+npm run test:personalization
+```
+
+Esse comando não substitui `npm run test:ci`: não exercita sozinho o roteamento HTTP do Worker, o armazenamento R2 real da integração ou a parada/reabertura do processo. TypeScript e ESLint também podem ser executados separadamente com `npm run typecheck` e `npm run lint`.
+
 `scripts/test-worker.mjs` executa o build real diretamente em Miniflare/workerd, com HTTP em loopback, assets e os bindings D1/R2 da configuração compilada. O adaptador e o runtime são resolvidos da mesma versão de Wrangler fixada pelo lockfile; atualizar essa dependência exige validar também o adaptador `unstable_getMiniflareWorkerOptions`. A persistência utiliza o mesmo diretório `v3` preparado pelas migrações. O runner exige `APP_ENV=test` e não repete requisições HTTP para esconder falhas.
 
 Essa execução direta evita o proxy de `wrangler dev`, cuja versão utilizada pode retornar uma mensagem enganosa de reinício após rejeitar um corpo em fluxo excessivo. A sequência de teste continua exigindo 413 para o corpo excessivo e 403 para a tentativa seguinte de origem indevida, sem pausa artificial ou nova tentativa de escrita. Relatos primários relacionados: [workers-sdk #15709](https://github.com/cloudflare/workers-sdk/issues/15709) e [#14641](https://github.com/cloudflare/workers-sdk/issues/14641). A API de execução está documentada em [Cloudflare — Miniflare](https://developers.cloudflare.com/workers/testing/miniflare/get-started/).
@@ -43,6 +58,7 @@ Para testar uma prévia local que já esteja em execução, forneça `VG_TEST_BA
 node tests/integration.mjs
 node tests/finance-reports.mjs
 node tests/backend-flows.mjs
+node tests/personalization-flows.mjs
 ```
 
 Somente depois de parar e reiniciar **o processo real que atende esse ambiente**, execute:
@@ -50,6 +66,7 @@ Somente depois de parar e reiniciar **o processo real que atende esse ambiente**
 ```sh
 node tests/integration.mjs --persistence
 node tests/backend-flows.mjs --persistence
+node tests/personalization-flows.mjs --persistence
 ```
 
 Na primeira suíte, use `VG_TEST_REPORT=outputs/restart-report.json` para preservar o resultado anterior. Executar uma consulta pela segunda vez no mesmo processo não comprova persistência após reinício.
@@ -78,7 +95,9 @@ O harness que inicia um Worker próprio é destinado ao ambiente local do desenv
 | CRM | Novo → em contato → experimental → convertido, conversão concorrente e proibição de reescrever contato convertido. |
 | Notificações | Aviso geral/dirigido, recusa de leitura indevida e marcadores de leitura individuais. |
 | Acessos | Sete papéis, impossibilidade de escalação, logins únicos, desativação e revogação efetiva de sessões. |
-| Personalização e mídia | Gravação, segunda sessão, conflito, restauração do tema, valores inseguros recusados, PNG real e limites de upload. |
+| Identidade e mídia | Marca/login completos, padrões por perfil, segunda sessão, campos inválidos recusados, imagens por finalidade, biblioteca paginada e acesso público restrito às imagens publicadas. |
+| Preferências pessoais | Sete contas isoladas, herança academia → perfil → pessoa, substituição completa e reset, rejeição de favoritos/página inicial sem permissão, concorrência e persistência. |
+| Temas e histórico | Temas/rascunhos sem publicação implícita, edição com versão, snapshots, comparação de campos e restauração que preserva regras operacionais/padrões atuais. |
 | Relatórios e auditoria | Agregados autorizados, conciliação de valores, CSV, proteção de fórmulas, registros e rotas sem mutação livre. |
 | Segurança | CSRF, origem, cookie, MFA com código de uso único, revogação, limites de corpo e limites exatos de rota. |
 
@@ -109,7 +128,13 @@ Referências primárias: [GitHub — uso seguro de Actions](https://docs.github.
 | Estoque | Recebimento, venda e estorno alteram o saldo uma única vez; não é permitido saldo negativo; editar nome preserva custo e estoque mínimo. |
 | Despesas | Alterar despesa paga exige justificativa e grava o novo valor. |
 | CRM e avisos | Conversão não duplica aluno; destinatário e leitura de notificação são respeitados. |
-| Personalização | Uma segunda sessão lê o tema gravado; salvamento obsoleto falha; o teste restaura o tema original. |
+| Personalização global | Uma segunda sessão lê a identidade gravada; salvamento obsoleto falha; snapshots e auditoria acompanham o commit. |
+| Preferências pessoais | A API só altera a conta da sessão; as sete contas conservam escolhas independentes, inclusive depois do reinício. |
+| Temas e rascunhos | Guardar ou editar um tema não publica suas escolhas; versões obsoletas são recusadas. |
+| Restauração visual | Restaurar cria uma nova versão e preserva os dias de carência e padrões por perfil atuais. |
+| Migração de personalização | `0003_personalization.sql` acrescenta tabelas; os testes preservam configuração, senha e imagem legadas, com snapshot inicial idempotente. |
+| Contraste calculado | Os pares de tokens testados atendem aos limiares numéricos definidos; isso não certifica a página renderizada nem a conformidade WCAG completa. |
+| Corridas do cliente | Respostas pertencentes a uma sessão antiga não substituem o CSRF atual nem encerram uma sessão mais recente. |
 | Upload | Um falso PNG é rejeitado e um PNG real é armazenado/servido. |
 | Relatórios | Indicadores têm valores reais; CSV é retornado e células perigosas recebem tratamento. |
 | MFA | Configuração, habilitação, login com código e desabilitação funcionam; habilitar/desabilitar encerra outras sessões da conta. |
@@ -130,8 +155,14 @@ Além da suíte HTTP, confira no navegador:
 5. Matrícula → cobrança → pagamento → check-in → check-out.
 6. Ação de risco com confirmação e justificativa.
 7. Edição de treino com mais de um exercício.
-8. Troca de fonte, posição da navegação, cores, logo e papel de parede, seguida de recarregamento.
-9. Tela menor, rolagem de tabela e formulário comprido.
-10. Sessão expirada e conflito causado por duas janelas editando o mesmo registro.
+8. Marca, favicon, logos claro/escuro, fonte, menu, cores, papel de parede e login, seguidos de recarregamento e nova autenticação.
+9. Preferências de duas contas no mesmo navegador; compactação do menu, escala do texto, favoritas e densidade das tabelas sem transferência de escolhas entre pessoas.
+10. Padrão por perfil, escolha pessoal que o substitui e retorno à herança após salvar os padrões.
+11. Guardar tema/rascunho sem mudar a aparência publicada; carregar na prévia, editar, salvar e reencontrar no histórico.
+12. Comparar e restaurar uma aparência anterior depois de alterar a carência operacional, confirmando que a regra atual é preservada.
+13. Conflitos de configurações, preferências e temas em duas janelas, com edições preservadas e combinação sujeita a revisão antes de salvar.
+14. Tema claro/escuro/automático, preferência de movimento reduzido, imagens claras/escuras e controles em estado normal, foco, erro e desabilitado.
+15. Tela menor, rolagem de tabela, formulário comprido e zoom do navegador.
+16. Sessão expirada, erro de rede e confirmação antes de sair com alterações não salvas.
 
 A automação HTTP não substitui esse percurso. Um botão visível e um `200` na página não comprovam que o fluxo da interface inteira está correto.

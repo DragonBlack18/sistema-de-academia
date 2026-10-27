@@ -53,3 +53,17 @@ Não foram importados projetos completos de gestão de academia. Isso evita mist
 ## Revisão de backend — 27/10/2026
 
 As fontes técnicas adicionais e as decisões verificadas estão em [SEGURANCA-BACKEND.md](SEGURANCA-BACKEND.md), [INTEGRIDADE-BACKEND.md](INTEGRIDADE-BACKEND.md) e [PRODUCAO.md](PRODUCAO.md). As referências incluem RFC 6238 (uso único de TOTP), D1 batch/limites/migrações, OWASP autorização/REST/uploads, especificações PNG/WebP e segurança de Actions.
+
+## Personalização — 27/10/2026
+
+| Fonte primária | Decisão de implementação e limite da evidência |
+| --- | --- |
+| [W3C — contraste mínimo, WCAG 2.2, 1.4.3](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html) | Cálculo de luminância relativa e contraste para o texto sobre cores personalizadas. A referência distingue texto comum (4,5:1), texto grande (3:1) e exceções. Medir pares de tokens não certifica a acessibilidade de toda a interface. |
+| [W3C — contraste de componentes e gráficos, 1.4.11](https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html) | Controles, estados e indicadores visuais necessários precisam ser identificáveis contra as cores adjacentes. O limiar aplicável de 3:1 é tratado sem arredondar um resultado inferior para aprovação. |
+| [MDN — prefers-color-scheme](https://developer.mozilla.org/en-US/docs/Web/CSS/@media/prefers-color-scheme) | Tema automático acompanha a preferência clara/escura informada pelo dispositivo. Uma preferência explícita salva na conta pode substituir o padrão da academia. |
+| [MDN — prefers-reduced-motion](https://developer.mozilla.org/en-US/docs/Web/CSS/@media/prefers-reduced-motion) | Respeitar a preferência do dispositivo por menos movimento e permitir a escolha pessoal correspondente. |
+| [Cloudflare — D1Database.batch](https://developers.cloudflare.com/d1/worker-api/d1-database/#batch) | Gravar a configuração, sua versão, o histórico e a auditoria no mesmo lote transacional. Asserções SQL devem falhar antes de um conflito de versão produzir alterações parciais. |
+| [Cloudflare — migrações D1](https://developers.cloudflare.com/d1/reference/migrations/) | Acrescentar tabelas de personalização sem apagar contas, imagens nem configurações anteriores. |
+| [OWASP — autorização](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html) | Preferências vinculadas à identidade autenticada; escrita da identidade da academia continua protegida por permissão no servidor. Ocultar um botão não substitui essa autorização. |
+
+O escopo entregue e as verificações efetivamente executadas ficam em [PERSONALIZACAO.md](PERSONALIZACAO.md) e [VALIDACAO-PERSONALIZACAO.md](VALIDACAO-PERSONALIZACAO.md).

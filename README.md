@@ -2,11 +2,27 @@
 
 Repositório: [DragonBlack18/sistema-de-academia](https://github.com/DragonBlack18/sistema-de-academia).
 
-**Versão 1.1.0 — revisão de backend, com frontend congelado.** As evidências da versão estão em [docs/VALIDACAO-EXECUTADA.md](docs/VALIDACAO-EXECUTADA.md), e os requisitos operacionais em [docs/PRODUCAO.md](docs/PRODUCAO.md).
+**Versão 1.2.0 — personalização por academia, perfil e conta.** Esta versão amplia a área de configurações e os componentes que aplicam a aparência, mantendo os módulos de gestão existentes. O funcionamento está em [docs/PERSONALIZACAO.md](docs/PERSONALIZACAO.md) e a validação desta rodada em [docs/VALIDACAO-PERSONALIZACAO.md](docs/VALIDACAO-PERSONALIZACAO.md). A revisão anterior do backend permanece documentada em [docs/VALIDACAO-EXECUTADA.md](docs/VALIDACAO-EXECUTADA.md); os requisitos de operação continuam em [docs/PRODUCAO.md](docs/PRODUCAO.md).
 
 Sistema web de gestão de academia, com interface em português, autenticação própria, permissões por função e armazenamento persistente. Os módulos compartilham alunos, matrículas, financeiro e frequência; a personalização visual também é salva no servidor.
 
 O projeto foi reconstruído como uma aplicação única e modular. A base atual usa **React + TypeScript, Vinext/Vite, Cloudflare Workers, D1/SQLite e R2**. Essa escolha permite executar o backend e o banco localmente e usar a mesma aplicação no ambiente hospedado. O PostgreSQL/FastAPI da proposta inicial não faz parte desta nova implementação. Não há importação automática dos dados do projeto anterior.
+
+## Novidades da versão 1.2.0
+
+Em **Configurações**, a identidade compartilhada fica em **Personalizar academia**; ajustes individuais ficam em **Minhas preferências**; senha e autenticador permanecem em **Segurança**.
+
+| Recurso | Comportamento entregue |
+| --- | --- |
+| Identidade da academia | Nome e mensagem aplicados à marca, logo principal, versões clara/escura, formato horizontal ou símbolo, exibição do nome e favicon. |
+| Tema e login | Temas claro, escuro e automático; fonte, cores, cantos, papel de parede e enquadramento; layout, imagem e textos do login. |
+| Experiência por conta | Menu à esquerda/direita, expandido/compacto, densidade das tabelas, texto em 100%/110%/120%, movimento, transparência, página inicial e até oito favoritas ordenáveis. |
+| Padrões por perfil | O administrador define escolhas iniciais para cada função. Uma escolha pessoal tem prioridade, sem conceder permissões adicionais. |
+| Biblioteca e prévia | Reutilização de imagens já enviadas; prévia de dashboard, tabela e login em apresentação de computador/celular. Os números da prévia são ilustrativos. |
+| Temas e rascunhos | Guardar uma aparência com nome não a publica. Abrir um tema prepara a prévia; **Salvar personalização** confirma a aplicação à academia. |
+| Histórico e conflitos | Snapshots por versão com autor/data, comparação e restauração. Conflitos preservam a edição e permitem revisar antes de salvar novamente. |
+
+A identidade, os padrões por perfil, as preferências pessoais e os temas são gravados no banco. As imagens permanecem no R2. Restaurar uma aparência cria uma nova versão e preserva a carência operacional, os padrões por perfil e as preferências pessoais atuais. A migração aditiva `0003_personalization.sql` não recria contas nem redefine senhas; veja o procedimento de atualização abaixo.
 
 ## Começar no Windows
 
@@ -83,11 +99,11 @@ As credenciais e a chave não devem ser adicionadas ao frontend, a URLs ou ao re
 | Relatórios | Agregados operacionais/financeiros e exportações CSV. |
 | Usuários | Contas, hierarquia, ativação/desativação e revogação de sessões. |
 | Auditoria | Registro de alterações e ações críticas com autor e data. |
-| Personalização | Nome, fonte, cor principal, fundo, logo, papel de parede, posição da navegação e ícones. |
+| Personalização | Identidade e login, temas claro/escuro/automático, preferências por perfil/conta, biblioteca de imagens, ícones, favoritos, temas/rascunhos nomeados e histórico restaurável. |
 
 ### Fluxo recomendado para a primeira conferência
 
-1. Entre como proprietário e confira **Personalização**.
+1. Entre como proprietário e confira **Configurações → Personalizar academia** e **Minhas preferências**.
 2. Cadastre um profissional e uma conta com perfil **Personal**.
 3. Cadastre um aluno e vincule esse profissional.
 4. Crie um plano e uma matrícula. Confira a cobrança gerada.
@@ -127,7 +143,7 @@ Os cenários concretos estão em [tests/integration.mjs](tests/integration.mjs),
 npm run test:ci
 ```
 
-Esse comando verifica TypeScript e ESLint, executa testes determinísticos de segurança/domínio/operação, compila a aplicação, cria um banco de teste separado, aplica as migrações, executa os fluxos HTTP reais, reinicia o mesmo ambiente e verifica os dados novamente. O banco operacional em `.wrangler/state` é preservado. As evidências são gravadas em `outputs/`. A matriz e os limites dos testes estão em [docs/TESTES.md](docs/TESTES.md).
+Esse comando verifica TypeScript e ESLint, executa testes determinísticos de segurança/domínio/operação/personalização, compila a aplicação, cria um banco de teste separado, aplica as migrações, executa os fluxos HTTP reais, reinicia o mesmo ambiente e verifica os dados novamente. O banco operacional em `.wrangler/state` é preservado. As evidências são gravadas em `outputs/`. A matriz e os limites dos testes estão em [docs/TESTES.md](docs/TESTES.md).
 
 A suíte inclui:
 
@@ -140,10 +156,20 @@ A suíte inclui:
 - capacidade de aula e reserva concorrente;
 - compras, recebimento, venda, estorno e estoque negativo;
 - CRM, notificações por destinatário e leitura persistida;
-- personalização, upload inválido e imagem armazenada;
+- personalização global, isolamento das preferências das sete contas, herança dos padrões e permissões dos atalhos;
+- temas/rascunhos, histórico, restauração, conflitos, validação dos uploads e privacidade de imagens não publicadas;
+- preservação de configurações antigas pela migração e contraste calculado dos tokens de tema;
 - relatórios, CSV e auditoria;
 - MFA, troca de senha e revogação de sessão;
 - persistência de SQL, arquivos e tema após reinicialização.
+
+Para verificar somente os invariantes determinísticos de personalização, sem iniciar um servidor ou usar o banco operacional:
+
+```powershell
+npm run test:personalization
+```
+
+Esse comando cobre persistência, concorrência, permissões, migração, tokens de tema e respostas atrasadas do cliente HTTP. A integração HTTP e a releitura depois de reiniciar continuam fazendo parte de `npm run test:ci`. Os resultados observados e seus limites estão em [docs/VALIDACAO-PERSONALIZACAO.md](docs/VALIDACAO-PERSONALIZACAO.md).
 
 Para executar somente a suíte HTTP contra **um ambiente de homologação já iniciado**:
 
@@ -153,9 +179,10 @@ $env:VG_TEST_ALLOW_WRITES = '1'
 # Defina VG_TEST_LOGIN e VG_TEST_PASSWORD com credenciais do ambiente de teste.
 npm run test:integration
 npm run test:backend
+node tests/personalization-flows.mjs
 ```
 
-Essa forma escreve registros com prefixo `QA` no ambiente indicado. Não a use no banco operacional. A conferência visual no navegador complementa os testes da API; a suíte HTTP não comprova comportamento de teclado, layout ou foco dos diálogos.
+Essa forma cria registros e contas sintéticas no ambiente indicado. Não a use no banco operacional. A conferência visual no navegador complementa os testes da API; a suíte HTTP não comprova comportamento de teclado, layout ou foco dos diálogos.
 
 ## GitHub e CI
 
@@ -195,9 +222,26 @@ docs/                Contratos, referências e operação
 
 A indentação acima não representa projetos aninhados: há um único `package.json` na raiz e uma aplicação principal. A descrição completa dos endpoints está em [docs/API-CONTRACT.md](docs/API-CONTRACT.md); os campos estão em [docs/DOMAIN-FIELDS.md](docs/DOMAIN-FIELDS.md).
 
+A personalização tem contratos compartilhados em `lib/personalization.ts`, cálculo dos tokens em `lib/theme.ts`, editor em `components/personalization/` e persistência em `server/settings.ts` e `server/personalization.ts`. A prévia e a aplicação usam o mesmo adaptador de tema.
+
 ## Atualização, backup e restauração
 
 Leia [docs/OPERACAO.md](docs/OPERACAO.md). Compilar ou atualizar o código preserva o banco e os arquivos quando as pastas de dados são mantidas. O procedimento de backup inclui o estado D1/R2 e o arquivo de variáveis. Não há comando de reset automático no fluxo de atualização.
+
+### Atualizar uma instalação existente para 1.2.0
+
+Encerre a aplicação e faça o backup descrito no guia de operação. Na mesma pasta do projeto já instalado, atualize o código sem remover `.dev.vars`, `.wrangler` ou os arquivos do ambiente local. Para uma instalação clonada do GitHub, sem alterações locais pendentes:
+
+```powershell
+git pull --ff-only
+npm ci
+npm run setup:local
+npm start
+```
+
+O setup compila e aplica somente as migrações locais pendentes. `0003_personalization.sql` acrescenta `user_preferences`, `settings_history` e `appearance_presets`; não apaga nem substitui tabelas operacionais. O bootstrap preserva a configuração existente como primeira versão do histórico de forma idempotente. Campos novos recebem padrões compatíveis durante a leitura. Contas, senhas, chave MFA, imagens e registros existentes permanecem preservados. Se o Git indicar alterações locais ou divergência, resolva a integração antes de continuar; não use reset do banco como parte da atualização.
+
+Se a instalação usa caminhos personalizados para persistência ou variáveis, mantenha os mesmos argumentos de setup/inicialização descritos em [docs/OPERACAO.md](docs/OPERACAO.md). Mudar o caminho de persistência pode abrir uma base diferente da que você pretende atualizar.
 
 ## Escopo e limites desta versão
 
@@ -206,6 +250,8 @@ Esta entrega é a **versão web de uma academia e uma unidade**. O Portal do Alu
 Pagamentos são registrados manualmente. A aplicação não cria cobranças reais em um gateway, não envia e-mails/WhatsApp e não aciona catracas físicas. Essas integrações precisam de contas, chaves e equipamentos homologados. Não há recuperação automática por e-mail enquanto não existir um serviço de envio configurado. A aplicação também não emite documentos fiscais.
 
 A execução é online: alterações precisam chegar ao servidor. Multiunidade, operação offline, tarefas agendadas de backup externo, importação do banco antigo e homologação de carga/segurança para produção são etapas próprias. O backend inclui verificação de prontidão em `/api/system/readiness`, restrita ao proprietário, e backup local verificável; consulte [docs/PRODUCAO.md](docs/PRODUCAO.md) antes de usar dados reais. Os dados de demonstração são sintéticos e não comprovam testes de escala.
+
+A personalização desta versão não inclui construtor livre de dashboards, recorte de imagens, importação/exportação de temas, fontes remotas, envio de conjuntos próprios de ícones ou CSS arbitrário. Aplicar uma aparência não altera as regras financeiras ou as permissões de acesso.
 
 ## Referências e decisões
 

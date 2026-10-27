@@ -19,16 +19,17 @@ function compileDirectory(source, output) {
   mkdirSync(output, { recursive: true });
   for (const entry of readdirSync(source, { withFileTypes: true })) {
     if (entry.isDirectory()) compileDirectory(path.join(source, entry.name), path.join(output, entry.name));
-    else if (entry.name.endsWith('.ts')) writeFileSync(path.join(output, entry.name.replace(/\.ts$/, '.js')), ts.transpileModule(readFileSync(path.join(source, entry.name), 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, esModuleInterop: true } }).outputText);
+    else if (entry.name.endsWith('.ts') && !entry.name.endsWith('.d.ts')) writeFileSync(path.join(output, entry.name.replace(/\.ts$/, '.js')), ts.transpileModule(readFileSync(path.join(source, entry.name), 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, esModuleInterop: true } }).outputText);
   }
 }
-compileDirectory(path.join(root, 'server'), compiled);
+compileDirectory(path.join(root, 'server'), path.join(compiled, 'server'));
+compileDirectory(path.join(root, 'lib'), path.join(compiled, 'lib'));
 const require = createRequire(import.meta.url);
-const { bootstrap, verifyDatabaseSchema } = require(path.join(compiled, 'bootstrap.js'));
-const { environmentName, validateRuntimeConfig, bootstrapCredentials } = require(path.join(compiled, 'config.js'));
-const { productionReadiness } = require(path.join(compiled, 'readiness.js'));
-const { hashPassword, verifyPassword, createTotpSecret, encryptSecret } = require(path.join(compiled, 'security.js'));
-const { publicUser } = require(path.join(compiled, 'auth.js'));
+const { bootstrap, verifyDatabaseSchema } = require(path.join(compiled, 'server/bootstrap.js'));
+const { environmentName, validateRuntimeConfig, bootstrapCredentials } = require(path.join(compiled, 'server/config.js'));
+const { productionReadiness } = require(path.join(compiled, 'server/readiness.js'));
+const { hashPassword, verifyPassword, createTotpSecret, encryptSecret } = require(path.join(compiled, 'server/security.js'));
+const { publicUser } = require(path.join(compiled, 'server/auth.js'));
 const config = { APP_ENV: 'test', ADMIN_LOGIN: 'operations-owner@example.invalid', ADMIN_PASSWORD: 'Synthetic-bootstrap-password-93!', ENABLE_DEMO_DATA: 'false', TOTP_ENCRYPTION_KEY: '7'.repeat(64) };
 const databases = [];
 const database = () => { const h = createD1Harness(readMigrations(root)); databases.push(h); return h; };

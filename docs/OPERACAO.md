@@ -17,6 +17,14 @@ Em hospedagem, D1 e R2 são recursos persistentes do ambiente. A publicação do
 
 O setup utiliza o histórico de migrações do Wrangler e aplica somente arquivos novos. Nunca edite uma migração já aplicada. Correções posteriores devem virar uma nova migração. O setup não tem comando de reset e não remove os dados existentes.
 
+### Personalização 1.2.0 e retorno de versão
+
+A migração `0003_personalization.sql` é aditiva e contém somente criação de tabelas e índice: preferências por conta, histórico de configurações e temas/rascunhos. A inicialização do aplicativo preserva a configuração existente como primeiro snapshot. Contas, credenciais, configurações, dados operacionais e imagens não são apagados nem recriados.
+
+Depois da primeira gravação no formato 1.2.0, `settings.value` passa a incluir os novos campos de personalização. O Worker 1.1.0 usa um schema estrito anterior e não interpreta esse JSON. **Voltar apenas ao código 1.1.0 após essa gravação deixa a configuração incompatível.** Corrija falhas de código com uma publicação que mantenha compatibilidade com o contrato 1.2.0. Aplique as migrações pendentes antes de iniciar o Worker atualizado; o healthcheck exige as três tabelas novas.
+
+Para desfazer uma aparência, use **Configurações → Personalizar academia → Histórico**. A restauração cria outra versão e preserva as regras de acesso, os padrões por perfil e as preferências pessoais. Não restaure uma cópia antiga de todo o banco apenas para trocar o tema: isso poderia substituir cadastros e lançamentos feitos depois do backup. Recuperação completa de dados segue o procedimento separado de restauração, com validação em outro ambiente e decisão explícita do responsável.
+
 ## Backup local no Windows
 
 O comando automatizado abaixo exige que você encerre a aplicação primeiro. Ele copia SQL, objetos R2 e `.dev.vars` para uma pasta nova fora do projeto, confere hashes antes/depois da cópia e cria um manifesto somente ao concluir. Não contém um comando que apaga ou substitui a base operacional.

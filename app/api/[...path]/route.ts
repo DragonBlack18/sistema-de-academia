@@ -3,6 +3,8 @@ import { ZodError } from 'zod';
 import { authenticate, checkCsrf, signIn, changePassword, audit, cookie, requirePermission } from '@/server/auth';
 import { ApiError, json, requireOrigin, secureResponse, uuid } from '@/server/security';
 import { readSettings, updateSettings, uploadAsset } from '@/server/settings';
+import { readPreferences, updatePreferences, readSettingsHistory, restoreSettings, handleThemes, listAssets } from '@/server/personalization';
+import { appearanceOf, ASSET_FIELDS } from '@/lib/personalization';
 import { handleUsers } from '@/server/users';
 import { handleMfa } from '@/server/mfa';
 import { handleDomain } from '@/server/domain';
@@ -40,8 +42,7 @@ async function route(request: Request, requestId: string): Promise<Response> {
     if (path === '/api/branding') {
       const invalid = methodAllowed(request, ['GET']);
       if (invalid) return invalid;
-      const branding = Object.fromEntries(Object.entries(settings.settings).filter(([key]) => key !== 'accessGraceDays'));
-      return json({ settings: branding });
+      return json({ settings: appearanceOf(settings.settings) });
     }
     if (path === '/api/login') {
       const invalid = methodAllowed(request, ['POST']);
@@ -51,7 +52,7 @@ async function route(request: Request, requestId: string): Promise<Response> {
       const invalid = methodAllowed(request, ['GET']);
       if (invalid) return invalid;
       const id = path.split('/')[3];
-      const isPublic = [settings.settings.logoAssetId, settings.settings.wallpaperAssetId].includes(id);
+      const isPublic = ASSET_FIELDS.some(field => settings.settings[field] === id);
       if (!isPublic) { const auth = await authenticate(request, db); requirePermission(auth.user, 'settings.read'); }
       const row = await db.prepare('SELECT object_key,mime FROM assets WHERE id=?').bind(id).first<{ object_key: string; mime: string }>();
       if (!row || !env.BUCKET) throw new ApiError(404, 'Imagem não encontrada.');
@@ -64,7 +65,9 @@ async function route(request: Request, requestId: string): Promise<Response> {
     if (request.method !== 'GET' && request.method !== 'HEAD') checkCsrf(request, auth.csrfToken);
     if (path === '/api/me') {
       const invalid = methodAllowed(request, ['GET']);
-      return invalid || json({ user: auth.user, csrfToken: auth.csrfToken, settings: settings.settings, settingsVersion: settings.version });
+      if (invalid) return invalid;
+      const preferences = await readPreferences(db, auth.user);
+      return json({ user: auth.user, csrfToken: auth.csrfToken, settings: settings.settings, settingsVersion: settings.version, preferences: preferences.preferences, preferencesVersion: preferences.version });
     }
     if (path === '/api/logout') {
       const invalid = methodAllowed(request, ['POST']);
@@ -82,9 +85,25 @@ async function route(request: Request, requestId: string): Promise<Response> {
       if (request.method === 'GET') { requirePermission(auth.user, 'settings.read'); return json(settings); }
       return await updateSettings(request, db, auth.user);
     }
-    if (path === '/api/assets') {
+    if (path === '/api/preferences') {
+      const invalid = methodAllowed(request, ['GET', 'PATCH']);
+      if (invalid) return invalid;
+      return request.method === 'GET' ? json(await readPreferences(db, auth.user)) : await updatePreferences(request, db, auth.user);
+    }
+    if (path === '/api/settings/history') {
+      const invalid = methodAllowed(request, ['GET']);
+      return invalid || await readSettingsHistory(url, db, auth.user);
+    }
+    const restoreMatch = path.match(/^\/api\/settings\/history\/(\d+)\/restore$/);
+    if (restoreMatch) {
       const invalid = methodAllowed(request, ['POST']);
-      return invalid || await uploadAsset(request, db, env.BUCKET, auth.user);
+      return invalid || await restoreSettings(request, db, auth.user, Number(restoreMatch[1]));
+    }
+    if (path === '/api/settings/themes' || path.startsWith('/api/settings/themes/')) return await handleThemes(request, url, db, auth.user);
+    if (path === '/api/assets') {
+      const invalid = methodAllowed(request, ['GET', 'POST']);
+      if (invalid) return invalid;
+      return request.method === 'GET' ? await listAssets(url, db, auth.user) : await uploadAsset(request, db, env.BUCKET, auth.user);
     }
     if (path === '/api/users' || path.startsWith('/api/users/')) return await handleUsers(request, url, db, auth.user);
     if (path.startsWith('/api/mfa/')) {

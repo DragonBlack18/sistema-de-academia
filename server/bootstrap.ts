@@ -24,6 +24,7 @@ export async function bootstrap(db: D1Database, config: RuntimeConfig): Promise<
     }
     await db.prepare("INSERT OR IGNORE INTO settings (id,value,version,updated_at) VALUES ('gym',?,1,?)")
       .bind(JSON.stringify(DEFAULT_SETTINGS), timestamp()).run();
+    await db.prepare("INSERT OR IGNORE INTO settings_history(version,value,created_by,created_at,source,restored_from) SELECT version,value,NULL,updated_at,'initial',NULL FROM settings WHERE id='gym'").run();
     if (config.ENABLE_DEMO_DATA === 'true') {
       try { await seedDemo(db, owner.id); }
       catch (error) {
@@ -42,4 +43,7 @@ export async function verifyDatabaseSchema(db: D1Database) {
   // SELECT 1 also succeeds before migrations: check required schema instead.
   await db.prepare('SELECT u.id,u.totp_last_counter,s.last_seen_at FROM users u LEFT JOIN sessions s ON s.user_id=u.id LIMIT 0').all();
   await db.prepare('SELECT id,version FROM settings LIMIT 0').all();
+  await db.prepare('SELECT user_id,value,version FROM user_preferences LIMIT 0').all();
+  await db.prepare('SELECT version,value,source,restored_from FROM settings_history LIMIT 0').all();
+  await db.prepare('SELECT id,value,version,kind FROM appearance_presets LIMIT 0').all();
 }
