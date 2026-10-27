@@ -16,6 +16,7 @@ A existência dos testes não significa que eles passaram. Os resultados executa
 - `outputs/backend-restart-report.json`: releitura de 18 módulos após reinicialização, comparada a snapshots sem credenciais.
 - `outputs/security-hardening-report.json`: testes determinísticos dos controles de autenticação e concorrência.
 - `outputs/domain-hardening-report.json`: testes determinísticos de regras e transações de domínio.
+- `outputs/operations-hardening-report.json`: configuração, bootstrap, prontidão e backup/restauração sintéticos.
 - `outputs/dependency-audit.json`: resultado da consulta de vulnerabilidades nas dependências de produção no CI.
 - `outputs/worker-test.log`: saída do Worker no ambiente isolado de testes.
 
@@ -31,6 +32,10 @@ npm run test:ci
 ```
 
 O harness cria uma pasta temporária ignorada em `.sites-runtime`, uma conta `qa.owner@example.invalid`, uma senha aleatória e uma chave de MFA próprias. Aplica todas as migrações em um D1 novo, inicia o Worker compilado, executa as suítes e reinicia o processo usando o mesmo diretório de persistência. Ele não reutiliza o banco normal em `.wrangler/state`, não usa o ambiente publicado e não imprime a senha. Os relatórios publicados pelo CI não incluem o arquivo de ambiente, o banco ou os snapshots completos das fixtures.
+
+`scripts/test-worker.mjs` executa o build real diretamente em Miniflare/workerd, com HTTP em loopback, assets e os bindings D1/R2 da configuração compilada. O adaptador e o runtime são resolvidos da mesma versão de Wrangler fixada pelo lockfile; atualizar essa dependência exige validar também o adaptador `unstable_getMiniflareWorkerOptions`. A persistência utiliza o mesmo diretório `v3` preparado pelas migrações. O runner exige `APP_ENV=test` e não repete requisições HTTP para esconder falhas.
+
+Essa execução direta evita o proxy de `wrangler dev`, cuja versão utilizada pode retornar uma mensagem enganosa de reinício após rejeitar um corpo em fluxo excessivo. A sequência de teste continua exigindo 413 para o corpo excessivo e 403 para a tentativa seguinte de origem indevida, sem pausa artificial ou nova tentativa de escrita. Relatos primários relacionados: [workers-sdk #15709](https://github.com/cloudflare/workers-sdk/issues/15709) e [#14641](https://github.com/cloudflare/workers-sdk/issues/14641). A API de execução está documentada em [Cloudflare — Miniflare](https://developers.cloudflare.com/workers/testing/miniflare/get-started/).
 
 Para testar uma prévia local que já esteja em execução, forneça `VG_TEST_BASE_URL`, `VG_TEST_ALLOW_WRITES=1`, `VG_TEST_LOGIN` e `VG_TEST_PASSWORD` pelo ambiente do processo. O teste complementar aceita somente `localhost`, `127.0.0.1`, `::1` ou a prévia interna `terminal.local`. Use uma base de teste separada e um meio de injeção de segredos que não grave valores no histórico do terminal. Não inclua senhas nos comandos salvos, nos commits ou nos relatórios.
 

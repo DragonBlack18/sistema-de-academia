@@ -44,7 +44,9 @@ Consultadas em 27 de outubro de 2026. Este documento registra por que cada refer
 
 ## Automação de validação
 
-O workflow usa as versões v7 documentadas nos repositórios oficiais de [actions/checkout](https://github.com/actions/checkout), [actions/setup-node](https://github.com/actions/setup-node) e [actions/upload-artifact](https://github.com/actions/upload-artifact), com Node 24 e permissões de leitura do código. As referências embasam a configuração; a execução remota ainda depende da publicação do repositório e do primeiro run de Actions.
+O workflow usa as versões v7 documentadas nos repositórios oficiais de [actions/checkout](https://github.com/actions/checkout), [actions/setup-node](https://github.com/actions/setup-node) e [actions/upload-artifact](https://github.com/actions/upload-artifact), com Node 24 e permissões de leitura do código. Os resultados efetivamente observados ficam em [VALIDACAO-EXECUTADA.md](VALIDACAO-EXECUTADA.md) e na aba Actions do repositório.
+
+O [Miniflare oficial](https://developers.cloudflare.com/workers/testing/miniflare/get-started/) executa o Worker compilado no CI, preservando os bindings e a persistência do ambiente isolado. Os relatos [workers-sdk #15709](https://github.com/cloudflare/workers-sdk/issues/15709) e [#14641](https://github.com/cloudflare/workers-sdk/issues/14641), junto à inspeção do código da versão instalada, orientaram a retirada do proxy de desenvolvimento do harness; os testes de corpo excessivo e origem continuam presentes e sem repetição automática.
 
 Não foram importados projetos completos de gestão de academia. Isso evita misturar autenticações, modelos de banco e regras financeiras incompatíveis. O contrato do produto está em [API-CONTRACT.md](API-CONTRACT.md), os campos em [DOMAIN-FIELDS.md](DOMAIN-FIELDS.md) e o comportamento visual em `DESIGN.md`/`UX-CONTRACT.md`.
 

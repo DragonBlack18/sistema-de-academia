@@ -161,7 +161,7 @@ Essa forma escreve registros com prefixo `QA` no ambiente indicado. Não a use n
 
 O workflow [.github/workflows/ci.yml](.github/workflows/ci.yml) executa em pushes para `main`/`master`, pull requests e acionamento manual. Ele instala o lockfile, executa `test-ci.mjs` e guarda os relatórios como artefatos. O workflow não publica automaticamente um ambiente com dados da academia.
 
-O histórico original e as branches preexistentes são preservados. A consolidação desta aplicação é feita na branch `backend/consolidacao-producao`, com pull request para `main` e validação do commit enviado.
+O histórico original e as branches preexistentes são preservados. A consolidação desta aplicação está registrada no [pull request #1](https://github.com/DragonBlack18/sistema-de-academia/pull/1), com validação do commit enviado antes da integração à `main`.
 
 As Actions são fixadas por SHA completo. O workflow usa `contents: read`, não persiste credenciais do checkout, gera senhas sintéticas aleatórias e não recebe segredos do ambiente operacional. A auditoria de dependências de produção falha a partir de vulnerabilidades moderadas. O Dependabot propõe atualizações sem mesclá-las automaticamente.
 
