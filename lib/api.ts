@@ -2,7 +2,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 let csrfToken = '';
-export const setCsrfToken = (token: string) => { csrfToken = token; };
+let authEpoch = 0;
+export const setCsrfToken = (token: string) => { if (csrfToken !== token) authEpoch += 1; csrfToken = token; };
 export class ApiError extends Error {
   constructor(message: string, public status: number, public fields?: Record<string, string>, public code?: string) { super(message); }
 }
@@ -20,6 +21,7 @@ function errorFields(value: unknown): Record<string, string> | undefined {
   return entries.length ? Object.fromEntries(entries) : undefined;
 }
 export async function api<T = unknown>(path: string, options: Omit<RequestInit, 'body'> & { body?: unknown } = {}): Promise<T> {
+  const requestEpoch = authEpoch;
   const url = path.startsWith('/api/') ? path : `/api${path.startsWith('/') ? '' : '/'}${path}`;
   const headers = new Headers(options.headers);
   const body = options.body;
@@ -36,6 +38,8 @@ export async function api<T = unknown>(path: string, options: Omit<RequestInit, 
     throw new ApiError('Sem conexão com o servidor. Verifique sua internet e tente novamente.', 0);
   }
   const content: unknown = await response.json().catch(() => ({ error: 'O servidor retornou uma resposta inesperada.' }));
+  // Ignore late data/401s from a former session, including after a different account signs in.
+  if (options.signal?.aborted || requestEpoch !== authEpoch) throw new DOMException('A sessão desta solicitação foi substituída.', 'AbortError');
   const envelope = isRecord(content) ? content : {};
   if (!response.ok) {
     if (response.status === 401 && !url.endsWith('/login') && !url.endsWith('/me')) window.dispatchEvent(new Event('vg:unauthorized'));
@@ -72,7 +76,7 @@ export function useApi<T = unknown>(path: string | null) {
 }
 export function notify(message:string,type:'success'|'error'|'info'='success'){if(typeof window!=='undefined')window.dispatchEvent(new CustomEvent('vg:toast',{detail:{message,type}}));}
 export type AppUser={id:string;name:string;login:string;role:string;active:boolean;permissions:string[];mustChangePassword?:boolean;totpEnabled?:boolean;version?:number};
-export type GymSettings={gymName:string;tagline:string;font:'manrope'|'inter'|'system';sidebarPosition:'left'|'right';iconStyle:'outline'|'solid';iconOverrides:Record<string,string>;accentColor:string;backgroundColor:string;logoAssetId:string|null;wallpaperAssetId:string|null;wallpaperOpacity:number;accessGraceDays:number};
-export const DEFAULT_THEME:GymSettings={gymName:'Vitality Gym',tagline:'Movimento que transforma.',font:'manrope',sidebarPosition:'left',iconStyle:'outline',iconOverrides:{},accentColor:'#b9f36b',backgroundColor:'#101211',logoAssetId:null,wallpaperAssetId:null,wallpaperOpacity:.12,accessGraceDays:3};
+export type { GymSettings } from './personalization';
+export { DEFAULT_SETTINGS as DEFAULT_THEME } from './personalization';
 export function hasPermission(user:AppUser,permission:string){return user.permissions.includes('*')||user.permissions.includes(permission);}
 export const roleLabels:Record<string,string>={super_admin:'Proprietário',admin:'Administrador',manager:'Gerente',reception:'Recepção',finance:'Financeiro',trainer:'Professor',personal:'Personal trainer'};

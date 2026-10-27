@@ -1,6 +1,6 @@
 # Preparação do ambiente de produção
 
-A versão 1.1.0 reforça o backend da aplicação web existente. Frontend, navegação e contratos dos formulários permanecem preservados. Código testado e configuração operacional são requisitos diferentes: o ambiente de demonstração não deve ser apresentado como academia em produção com dados reais.
+A versão 1.2.0 acrescenta personalização persistente à base de segurança e integridade da versão 1.1.0: marca e temas compartilhados, preferências por conta, padrões por perfil e histórico de aparência. Código testado e configuração operacional são requisitos diferentes: o ambiente de demonstração não deve ser apresentado como academia em produção com dados reais.
 
 ## Ambiente e segredos
 
@@ -39,13 +39,19 @@ O ambiente privado demonstrativo pode retornar 503 corretamente. Não remova dad
 ## Implantação e atualização
 
 - A hospedagem atual usa Workers, D1 e R2. A audiência privada do Site deve ser preservada até uma decisão explícita de abertura.
-- As migrações são incrementais. `0000` permanece intacta; `0001` acrescenta atividade de sessão e consumo TOTP; `0002` acrescenta índices para limpeza limitada.
+- As migrações são incrementais. `0000` permanece intacta; `0001` acrescenta atividade de sessão e consumo TOTP; `0002` acrescenta índices para limpeza limitada; `0003` cria somente o schema de preferências, histórico e temas/rascunhos.
 - Não use comandos de reset, `DROP`, exclusão de volumes ou recriação do banco como atualização.
 - Faça backup consistente, registre a versão do código e aplique somente migrações pendentes.
 - Depois da atualização, confira saúde, login, uma gravação de teste autorizada, relatório de prontidão e leitura dos dados anteriores.
 - Voltar apenas o código para uma versão antiga não desfaz migrações. As migrações desta entrega são aditivas; qualquer restauração de dados deve ser planejada e testada em ambiente separado.
 
 O CI executa sobre dados efêmeros, com credenciais sintéticas. Não possui credenciais para publicar ou alterar a base operacional. A implantação do Site usa o fluxo próprio do provedor; hospedar numa conta Cloudflare independente exige provisionar os próprios recursos e segredos.
+
+### Compatibilidade de recuperação da versão 1.2.0
+
+Aplique `0003` antes de iniciar o Worker atualizado; o healthcheck verifica as tabelas novas. O bootstrap registra o snapshot da configuração existente sem redefini-la. Não há reset, limpeza de dados ou alteração das credenciais nessa atualização.
+
+Após gravar a personalização no formato novo, voltar somente ao bundle 1.1.0 é incompatível: o schema antigo rejeita os novos campos de `settings.value`. Recupere o código por uma publicação que continue entendendo o contrato 1.2.0. Para recuperar apenas a aparência, use o histórico dentro do aplicativo atualizado; a restauração preserva regras, padrões de perfil e preferências individuais. Não exclua tabelas nem restaure indiscriminadamente um banco anterior para reverter uma configuração visual. Uma restauração completa de dados deve ser verificada em ambiente separado, considerando todos os registros criados depois da cópia.
 
 ## Observação de falhas
 

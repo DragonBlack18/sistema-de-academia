@@ -1,2 +1,10 @@
-import type { GymSettings } from '@/lib/api';
-export function Brand({settings,compact=false}:{settings?:Partial<GymSettings>;compact?:boolean}){return <div className={`vg-brand ${compact?'vg-brand--compact':''}`} aria-label={settings?.gymName||'Vitality Gym'}>{settings?.logoAssetId?<img className="vg-brand-image" src={`/api/assets/${settings.logoAssetId}`} alt="" width={40} height={40}/>:<svg width="38" height="38" viewBox="0 0 44 44" fill="none" aria-hidden="true"><path d="M6 9h9l7 17L29 9h9L25 36h-6L6 9Z" fill="currentColor"/><path d="m23 9 4 8 4-8h-8Z" fill="var(--surface)"/></svg>}{!compact&&<span><strong>{settings?.gymName||'Vitality Gym'}</strong><small>GESTÃO EM MOVIMENTO</small></span>}</div>;}
+import type { GymSettings } from '@/lib/personalization';
+export function Brand({ settings, compact = false, mode = 'dark' }: { settings?: Partial<GymSettings>; compact?: boolean; mode?: 'dark' | 'light' }) {
+  const name = settings?.gymName || 'Vitality Gym';
+  const asset = (mode === 'dark' ? settings?.logoDarkAssetId : settings?.logoLightAssetId) || settings?.logoAssetId;
+  const horizontal = settings?.logoLayout === 'horizontal' && !compact;
+  return <div className={`vg-brand ${compact ? 'vg-brand--compact' : ''} ${horizontal ? 'vg-brand--horizontal' : ''}`} aria-label={name}>
+    {asset ? <img className="vg-brand-image" src={`/api/assets/${encodeURIComponent(asset)}`} alt="" width={horizontal ? 160 : 40} height={40}/> : <svg width="38" height="38" viewBox="0 0 44 44" fill="none" aria-hidden="true"><path d="M6 9h9l7 17L29 9h9L25 36h-6L6 9Z" fill="currentColor"/><path d="m23 9 4 8 4-8h-8Z" fill="var(--surface)"/></svg>}
+    {!compact && settings?.showGymName !== false && <span><strong title={name}>{name}</strong><small title={settings?.tagline}>{settings?.tagline ?? 'Movimento que transforma.'}</small></span>}
+  </div>;
+}

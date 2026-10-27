@@ -15,7 +15,7 @@ function compile(directory) {
   for (const entry of readdirSync(path.join(root, directory), { withFileTypes: true })) {
     const relative = path.join(directory, entry.name);
     if (entry.isDirectory()) { compile(relative); continue; }
-    if (!entry.name.endsWith('.ts')) continue;
+    if (!entry.name.endsWith('.ts') || entry.name.endsWith('.d.ts')) continue;
     const target = path.join(compiled, relative.replace(/\.ts$/, '.js'));
     mkdirSync(path.dirname(target), { recursive: true });
     writeFileSync(target, ts.transpileModule(readFileSync(path.join(root, relative), 'utf8'), {
@@ -24,6 +24,7 @@ function compile(directory) {
   }
 }
 compile('server');
+compile('lib');
 const require = createRequire(import.meta.url);
 const { handleDomain } = require(path.join(compiled, 'server/domain.js'));
 const { rolePermissions } = require(path.join(compiled, 'server/auth.js'));

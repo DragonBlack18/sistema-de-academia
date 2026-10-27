@@ -1,6 +1,6 @@
 {
   "name": "vitality-gym",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -20,7 +20,8 @@
     "test:security": "node tests/security-hardening.mjs",
     "test:domain": "node tests/domain-hardening.mjs",
     "test:operations": "node tests/operations-hardening.mjs",
-    "test:backend": "node tests/backend-flows.mjs"
+    "test:backend": "node tests/backend-flows.mjs",
+    "test:personalization": "node tests/personalization-hardening.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

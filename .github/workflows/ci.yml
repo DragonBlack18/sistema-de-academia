@@ -50,6 +50,9 @@ jobs:
             outputs/security-hardening-report.json
             outputs/domain-hardening-report.json
             outputs/operations-hardening-report.json
+            outputs/personalization-hardening-report.json
+            outputs/personalization-flows-report.json
+            outputs/personalization-restart-report.json
             outputs/dependency-audit.json
             outputs/worker-test.log
           if-no-files-found: warn

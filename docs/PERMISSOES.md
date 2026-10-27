@@ -12,7 +12,17 @@ A versão web usa uma academia, uma unidade e um perfil principal por conta. O c
 | Professor (`trainer`) | Sem acesso | Consulta de alunos e frequência vinculados; gerencia suas aulas | Sem acesso | Cria e altera fichas/avaliações dos alunos vinculados | Sem alteração |
 | Personal (`personal`) | Sem acesso | Consulta de alunos e frequência vinculados; consulta aulas | Sem acesso | Cria e altera fichas/avaliações dos alunos vinculados | Sem alteração |
 
-Todos os perfis autenticados podem consultar os avisos gerais ou destinados à própria conta, marcar seus avisos como lidos, trocar a própria senha, configurar seu autenticador e sair da sessão.
+Todos os perfis autenticados podem consultar os avisos gerais ou destinados à própria conta, marcar seus avisos como lidos, trocar a própria senha, configurar seu autenticador, ajustar suas preferências pessoais e sair da sessão. A coluna Personalização da tabela descreve a **identidade compartilhada da academia**; as preferências da própria conta estão disponíveis para todos os perfis ativos.
+
+## Personalização da academia e preferências pessoais
+
+- Proprietário e administrador podem publicar a marca, editar padrões por perfil, salvar temas e rascunhos, consultar/restaurar o histórico de aparência e reutilizar imagens da biblioteca. As permissões continuam `settings.read` e `settings.write`.
+- Qualquer conta ativa pode consultar e gravar `/api/preferences`. O servidor usa exclusivamente o identificador da sessão; o corpo não aceita escolher outro usuário.
+- Preferências individuais substituem padrões do perfil apenas para a própria pessoa. Um objeto vazio remove as sobreposições e restaura a herança.
+- Tema, fonte, posição e modo da navegação, densidade, escala de texto e acessibilidade não alteram autorização. Página inicial e favoritos são validados contra o catálogo de permissões do titular.
+- Configurações de aparência restauradas não restauram a carência operacional nem os padrões atuais dos perfis. O histórico é preservado, e a restauração gera uma nova versão com auditoria.
+- Rascunhos e temas não são publicados ao salvar. Imagens não publicadas exigem `settings.read`, mesmo quando alguém conhece o identificador do arquivo.
+- As gravações revalidam sessão e autorização na mesma transação que os dados. Perder o acesso durante uma edição impede seu commit.
 
 ## Controles de segurança
 
